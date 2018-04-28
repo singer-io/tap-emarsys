@@ -3,6 +3,7 @@ from datetime import datetime, date
 import pendulum
 import singer
 from singer import bookmarks as bks_
+
 from .http import Client
 
 class Context(object):

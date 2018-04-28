@@ -2,6 +2,7 @@ from functools import partial
 
 import singer
 import pendulum
+
 from .schemas import IDS, get_contacts_raw_fields, get_contact_field_type, normalize_fieldname
 
 LOGGER = singer.get_logger()
@@ -31,6 +32,7 @@ def sync_campaigns(ctx):
     def campaign_transformed(campaign):
         return base_transform(campaign, ['created', 'deleted'])
     data_transformed = list(map(campaign_transformed, data))
+    ## TODO: select fields?
     write_records('campaigns', data_transformed)
 
 def transform_contact(field_id_map, contact):
@@ -97,9 +99,18 @@ def sync_contacts(ctx):
 
     paginate_contacts(ctx, field_id_map, selected_fields)
 
+def sync_contact_lists(ctx):
+    data = ctx.client.get('/contactlist')
+    ## TODO: select fields?
+    def contact_list_transform(contact_list):
+        return base_transform(contact_list, ['created'])
+    data_transformed = list(map(contact_list_transform, data))
+    write_records('contact_lists', data_transformed)
+
 STREAM_SYNCS = {
     'campaigns': sync_campaigns,
-    'contacts': sync_contacts
+    'contacts': sync_contacts,
+    'contact_lists': sync_contact_lists
 }
 
 def sync_selected_streams(ctx):

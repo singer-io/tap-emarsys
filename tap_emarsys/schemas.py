@@ -8,12 +8,14 @@ from singer.catalog import Schema
 class IDS(object):
     CAMPAIGNS = 'campaigns'
     CONTACTS = 'contacts'
+    CONTACT_LISTS = 'contact_lists'
 
-static_schema_stream_ids = [IDS.CAMPAIGNS]
+static_schema_stream_ids = [IDS.CAMPAIGNS, IDS.CONTACT_LISTS]
 
 PK_FIELDS = {
     IDS.CAMPAIGNS: ['id'],
-    IDS.CONTACTS: ['id']
+    IDS.CONTACTS: ['id'],
+    IDS.CONTACT_LISTS: ['id']
 }
 
 def normalize_fieldname(fieldname):
