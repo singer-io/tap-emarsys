@@ -54,6 +54,8 @@ class Client(object):
         kwargs['headers']['Content-Type'] = 'application/json'
 
         if 'tap_stream_id' in kwargs:
+            tap_stream_id = kwargs['tap_stream_id']
+            del kwargs['tap_stream_id']
             with metrics.http_request_timer(tap_stream_id) as timer:
                 response = requests.request(method, self.url(path), **kwargs)
                 timer.tags[metrics.Tag.http_status_code] = response.status_code

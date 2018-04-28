@@ -63,7 +63,7 @@ def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0):
         'keyValues': list(map(lambda x: x['id'], contact_list_page['result'])),
         'fields': list(map(lambda x: x['id'], selected_fields))
     }
-    contact_page = ctx.client.post('/contact/getdata', query)
+    contact_page = ctx.client.post('/contact/getdata', query, tap_stream_id='contacts')
 
     contacts = list(map(partial(transform_contact, field_id_map), contact_page['result']))
     write_records('contacts', contacts)
@@ -99,22 +99,47 @@ def sync_contacts(ctx):
 
     paginate_contacts(ctx, field_id_map, selected_fields)
 
-def sync_contact_lists(ctx):
-    data = ctx.client.get('/contactlist')
+def sync_contact_lists(ctx, sync):
+    data = ctx.client.get('/contactlist', tap_stream_id='contact_lists')
     ## TODO: select fields?
     def contact_list_transform(contact_list):
         return base_transform(contact_list, ['created'])
     data_transformed = list(map(contact_list_transform, data))
-    write_records('contact_lists', data_transformed)
+    if sync:
+        write_records('contact_lists', data_transformed)
+    return data_transformed
 
-STREAM_SYNCS = {
-    'campaigns': sync_campaigns,
-    'contacts': sync_contacts,
-    'contact_lists': sync_contact_lists
-}
+def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0):
+    membership_ids = ctx.client.get('/contactlist/{}/'.format(contact_list_id),
+                                    params={
+                                        'limit': limit,
+                                        'offset': offset
+                                    },
+                                    tap_stream_id='contact_list_memberships')
+    memberships = []
+    for membership_id in membership_ids:
+        memberships.append({
+            'contact_list_id': contact_list_id,
+            'contact_id': membership_id
+        })
+    write_records('contact_list_memberships', memberships)
+
+    if len(membership_ids) == limit:
+        sync_contact_list_memberships(ctx, contact_list_id, limit=limit, offset=offset + limit)
+
+def sync_contact_lists_memberships(ctx, contact_lists):
+    for contact_list in contact_lists:
+        sync_contact_list_memberships(ctx, contact_list['id'])
 
 def sync_selected_streams(ctx):
     selected_streams = ctx.selected_stream_ids
 
-    for stream in selected_streams:
-        STREAM_SYNCS[stream](ctx)
+    if IDS.CAMPAIGNS in selected_streams:
+        sync_campaigns(ctx)
+    if IDS.CONTACTS in selected_streams:
+        sync_contacts(ctx)
+    if IDS.CONTACT_LISTS in selected_streams or \
+       IDS.CONTACT_LIST_MEMBERSHIPS in selected_streams:
+        contact_lists = sync_contact_lists(ctx, IDS.CONTACT_LISTS in selected_streams)
+    if IDS.CONTACT_LIST_MEMBERSHIPS in selected_streams:
+        sync_contact_lists_memberships(ctx, contact_lists)

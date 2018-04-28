@@ -9,13 +9,19 @@ class IDS(object):
     CAMPAIGNS = 'campaigns'
     CONTACTS = 'contacts'
     CONTACT_LISTS = 'contact_lists'
+    CONTACT_LIST_MEMBERSHIPS = 'contact_list_memberships'
 
-static_schema_stream_ids = [IDS.CAMPAIGNS, IDS.CONTACT_LISTS]
+static_schema_stream_ids = [
+    IDS.CAMPAIGNS,
+    IDS.CONTACT_LISTS,
+    IDS.CONTACT_LIST_MEMBERSHIPS
+]
 
 PK_FIELDS = {
     IDS.CAMPAIGNS: ['id'],
     IDS.CONTACTS: ['id'],
-    IDS.CONTACT_LISTS: ['id']
+    IDS.CONTACT_LISTS: ['id'],
+    IDS.CONTACT_LIST_MEMBERSHIPS: ['contact_list_id', 'contact_id']
 }
 
 def normalize_fieldname(fieldname):
