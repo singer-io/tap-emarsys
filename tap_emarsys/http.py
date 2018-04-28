@@ -1,18 +1,22 @@
 import os
 import hashlib
+import json
 from datetime import datetime
 from binascii import hexlify
 from base64 import b64encode
 
 import requests
 import backoff
+import singer
 from singer import metrics
+
+LOGGER = singer.get_logger()
 
 class RateLimitException(Exception):
     pass
 
 class Client(object):
-    BASE_URL = 'http://api.emarsys.net/api/v2'
+    BASE_URL = 'https://api.emarsys.net/api/v2'
 
     def __init__(self, config):
         self.user_agent = config.get('user_agent')
@@ -40,22 +44,36 @@ class Client(object):
                           RateLimitException,
                           max_tries=10,
                           factor=2)
-    def request(self, tap_stream_id, method, path, **kwargs):
+    def request(self, method, path, **kwargs):
         if 'headers' not in kwargs:
             kwargs['headers'] = {}
         if self.user_agent:
             kwargs['headers']['User-Agent'] = self.user_agent
         kwargs['headers']['X-WSSE'] = self.get_wsse_header()
-        print(kwargs)
 
-        with metrics.http_request_timer(tap_stream_id) as timer:
+        kwargs['headers']['Content-Type'] = 'application/json'
+
+        if 'tap_stream_id' in kwargs:
+            with metrics.http_request_timer(tap_stream_id) as timer:
+                response = requests.request(method, self.url(path), **kwargs)
+                timer.tags[metrics.Tag.http_status_code] = response.status_code
+        else:
             response = requests.request(method, self.url(path), **kwargs)
-            timer.tags[metrics.Tag.http_status_code] = response.status_code
+
         ## TODO: check replyCode?
         if response.status_code in [429, 503]:
             raise RateLimitException()
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            LOGGER.error('{} - {}'.format(response.status_code, response.text))
+            raise
         return response.json()['data']
 
-    def get(self, tap_stream_id, path, **kwargs):
-        return self.request(tap_stream_id, 'get', path, **kwargs)
+    def get(self, path, **kwargs):
+        return self.request('get', path, **kwargs)
+
+    def post(self, path, data, **kwargs):
+        kwargs['data'] = json.dumps(data)
+        return self.request('post', path, **kwargs)
+

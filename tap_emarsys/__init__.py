@@ -41,7 +41,7 @@ def discover(ctx):
     catalog.dump()
 
 def sync(ctx):
-    for tap_stream_id in ctx.selected_stream_ids:
+    for tap_stream_id in schemas.static_schema_stream_ids:
         schemas.load_and_write_schema(tap_stream_id)
     streams.sync_selected_streams(ctx)
     ctx.write_state()

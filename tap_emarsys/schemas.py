@@ -28,8 +28,11 @@ def get_contact_field_type(raw_field_type):
         return 'number', None
     return 'string', None
 
+def get_contacts_raw_fields(ctx):
+    return ctx.client.get('/field')
+
 def get_contacts_schema(ctx):
-    raw_fields = ctx.client.get('fields', '/field')
+    raw_fields = get_contacts_raw_fields(ctx)
     properties = {}
     for raw_field in raw_fields:
         _type, _format = get_contact_field_type(raw_field['application_type'])
