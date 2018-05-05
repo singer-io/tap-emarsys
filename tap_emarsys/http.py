@@ -63,7 +63,7 @@ class Client(object):
             response = requests.request(method, self.url(path), **kwargs)
 
         ## TODO: check replyCode?
-        if response.status_code in [429, 503]:
+        if response.status_code in [423, 429, 503]:
             raise RateLimitException()
         try:
             response.raise_for_status()

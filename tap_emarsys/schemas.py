@@ -10,18 +10,42 @@ class IDS(object):
     CONTACTS = 'contacts'
     CONTACT_LISTS = 'contact_lists'
     CONTACT_LIST_MEMBERSHIPS = 'contact_list_memberships'
+    METRICS = 'metrics'
 
 static_schema_stream_ids = [
     IDS.CAMPAIGNS,
     IDS.CONTACT_LISTS,
-    IDS.CONTACT_LIST_MEMBERSHIPS
+    IDS.CONTACT_LIST_MEMBERSHIPS,
+    IDS.METRICS
 ]
 
 PK_FIELDS = {
     IDS.CAMPAIGNS: ['id'],
     IDS.CONTACTS: ['id'],
     IDS.CONTACT_LISTS: ['id'],
-    IDS.CONTACT_LIST_MEMBERSHIPS: ['contact_list_id', 'contact_id']
+    IDS.CONTACT_LIST_MEMBERSHIPS: ['contact_list_id', 'contact_id'],
+    IDS.METRICS: ['date', 'metric', 'contact_id']
+}
+
+METRICS_AVAILABLE = [
+    'opened',
+    'not_opened',
+    'received',
+    'clicked',
+    'not_clicked',
+    'bounced',
+    'hard_bounced',
+    'soft_bounced',
+    'block_bounced'
+]
+
+ROOT_METADATA = {
+    IDS.METRICS: {
+        'metadata': {
+            'tap-emarsys.metrics-available': METRICS_AVAILABLE
+        },
+        'breadcrumb': []
+    }
 }
 
 def normalize_fieldname(fieldname):

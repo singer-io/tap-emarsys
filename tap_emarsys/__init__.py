@@ -24,11 +24,15 @@ def discover(ctx):
     for tap_stream_id in schemas.static_schema_stream_ids:
         schema = Schema.from_dict(schemas.load_schema(tap_stream_id),
                                   inclusion="automatic")
+        metadata = []
+        if tap_stream_id in schemas.ROOT_METADATA:
+            metadata.append(schemas.ROOT_METADATA[tap_stream_id])
         catalog.streams.append(CatalogEntry(
             stream=tap_stream_id,
             tap_stream_id=tap_stream_id,
             key_properties=schemas.PK_FIELDS[tap_stream_id],
-            schema=schema
+            schema=schema,
+            metadata=metadata
         ))
     contacts_schema = schemas.get_contacts_schema(ctx)
     catalog.streams.append(CatalogEntry(
