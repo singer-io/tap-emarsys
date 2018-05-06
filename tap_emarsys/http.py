@@ -1,6 +1,7 @@
 import os
 import hashlib
 import json
+import time
 from datetime import datetime
 from binascii import hexlify
 from base64 import b64encode
@@ -24,6 +25,9 @@ class Client(object):
         self.username = config.get('username')
         self.secret = config.get('secret')
 
+        self.calls_remaining = None
+        self.limit_reset = None
+
     def get_wsse_header(self):
         nonce = hexlify(os.urandom(16)).decode('utf-8')
         created = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S+00:00')
@@ -45,6 +49,11 @@ class Client(object):
                           max_tries=10,
                           factor=2)
     def request(self, method, path, **kwargs):
+        if self.calls_remaining is not None and self.calls_remaining == 0:
+            wait = self.limit_reset - int(time.monotonic())
+            if wait > 0 and wait <= 300:
+                time.sleep(wait)
+
         if 'headers' not in kwargs:
             kwargs['headers'] = {}
         if self.user_agent:
@@ -62,7 +71,9 @@ class Client(object):
         else:
             response = requests.request(method, self.url(path), **kwargs)
 
-        ## TODO: check replyCode?
+        self.calls_remaining = int(response.headers['X-Ratelimit-Remaining'])
+        self.limit_reset = int(response.headers['X-Ratelimit-Reset'])
+
         if response.status_code in [423, 429, 503]:
             raise RateLimitException()
         try:

@@ -4,7 +4,7 @@ from functools import partial
 import singer
 import pendulum
 import requests
-from singer import metadata
+from singer import metadata, metrics
 from singer.bookmarks import write_bookmark, clear_bookmark
 from ratelimit import limits, sleep_and_retry, RateLimitException
 from backoff import on_exception, expo
@@ -157,17 +157,17 @@ def post_metric(ctx, metric, date, campaign_id):
     })
 
 def sync_metric(ctx, campaign_id, metric, date):
-    ## TODO: job metrics
-    job = post_metric(ctx, metric, date, campaign_id)
+    with metrics.job_timer('daily_aggregated_metric'):
+        job = post_metric(ctx, metric, date, campaign_id)
 
-    num_attempts = 0
-    while num_attempts < 10:
-        num_attempts += 1
-        data = ctx.client.get('/email/{}/responses'.format(job['id']))
-        if data != '':
-            break
-        else:
-            time.sleep(5)
+        num_attempts = 0
+        while num_attempts < 10:
+            num_attempts += 1
+            data = ctx.client.get('/email/{}/responses'.format(job['id']))
+            if data != '':
+                break
+            else:
+                time.sleep(5)
 
     if len(data['contact_ids']) == 1 and data['contact_ids'][0] == '':
         return
@@ -231,9 +231,9 @@ def sync_metrics(ctx, campaigns):
             last_date = None
             while current_date <= end_date:
                 sync_metric(ctx, campaign_id, metric, current_date.to_date_string())
-                current_date = current_date.add(days=1)
-                date_to_resume = current_date ## TODO: can be greaterthan end_date
+                date_to_resume = current_date
                 write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, date_to_resume)
+                current_date = current_date.add(days=1)
             date_to_resume = None
             metrics_to_resume.remove(metric)
         campaigns_to_resume.remove(campaign_id)

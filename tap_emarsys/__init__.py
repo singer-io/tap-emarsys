@@ -15,8 +15,7 @@ REQUIRED_CONFIG_KEYS = ["username", "secret"]
 LOGGER = singer.get_logger()
 
 def check_credentials_are_authorized(ctx):
-    ## TODO: hit endpoint and test creds
-    pass
+    ctx.client.get('/settings')
 
 def discover(ctx):
     check_credentials_are_authorized(ctx)
