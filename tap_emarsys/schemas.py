@@ -66,24 +66,31 @@ def get_contacts_raw_fields(ctx):
 def get_contacts_schema(ctx):
     raw_fields = get_contacts_raw_fields(ctx)
     properties = {}
+    metadata = []
     for raw_field in raw_fields:
         _type, _format = get_contact_field_type(raw_field['application_type'])
         json_schema = {
-            'type': ['null', _type],
-            'inclusion': 'available'
+            'type': ['null', _type]
         }
         if _format is not None:
             json_schema['format'] = _format
-        properties[normalize_fieldname(raw_field['name'])] = json_schema
+        field_name = normalize_fieldname(raw_field['name'])
+        properties[field_name] = json_schema
+        metadata.append({
+            'metadata': {
+                'inclusion': 'available'
+            },
+            'breadcrumb': ['properties', field_name]
+        })
 
-    properties['id'] = {
-        'type': ['string'],
-        'inclusion': 'automatic'
-    }
-    properties['uid'] = {
-        'type': ['string'],
-        'inclusion': 'automatic'
-    }
+    for field_name in ['id', 'uid']:
+        properties[field_name] = {'type': ['string']}
+        metadata.append({
+            'metadata': {
+                'inclusion': 'automatic'
+            },
+            'breadcrumb': ['properties', field_name]
+        })
 
     schema = {
         'type': ['object'],
@@ -91,7 +98,7 @@ def get_contacts_schema(ctx):
         'properties': properties
     }
 
-    return Schema.from_dict(schema)
+    return Schema.from_dict(schema), metadata
 
 def get_abs_path(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)

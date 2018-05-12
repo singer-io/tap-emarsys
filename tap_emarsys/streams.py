@@ -4,7 +4,7 @@ from functools import partial
 import singer
 import pendulum
 import requests
-from singer import metadata, metrics
+from singer import metadata
 from singer.bookmarks import write_bookmark, clear_bookmark
 from ratelimit import limits, sleep_and_retry, RateLimitException
 from backoff import on_exception, expo
@@ -19,15 +19,15 @@ from .schemas import (
 
 LOGGER = singer.get_logger()
 
-def metrics(tap_stream_id, records):  
+def count(tap_stream_id, records):  
     with singer.metrics.record_counter(tap_stream_id) as counter:
         counter.increment(len(records))
 
 def write_records(tap_stream_id, records):
     singer.write_records(tap_stream_id, records)
-    metrics(tap_stream_id, records)
+    count(tap_stream_id, records)
 
-def base_transform(obj, date_fields):
+def base_transform(date_fields, obj):
     new_obj = {}
     for field, value in obj.items():
         if value == '':
@@ -37,16 +37,26 @@ def base_transform(obj, date_fields):
         new_obj[field] = value
     return new_obj
 
+def select_fields(mdata, obj):
+    new_obj = {}
+    for key, value in obj.items():
+        metadata = mdata.get(('properties', key))
+        if metadata and \
+           (metadata.get('selected') == True or
+            metadata.get('inclusion') == 'automatic'):
+           new_obj[key] = value
+    return new_obj
+
 def sync_campaigns(ctx, sync):
     data = ctx.client.get('/email/', tap_stream_id='campaigns', params={
         'showdeleted': 1
     })
-    def campaign_transformed(campaign):
-        return base_transform(campaign, ['created', 'deleted'])
-    data_transformed = list(map(campaign_transformed, data))
+    data_transformed = list(map(partial(base_transform, ['created', 'deleted']), data))
     if sync:
-        ## TODO: select fields?
-        write_records('campaigns', data_transformed)
+        stream = ctx.catalog.get_stream('campaigns')
+        mdata = metadata.to_map(stream.metadata)
+        data_selected = list(map(partial(select_fields, mdata), data_transformed))
+        write_records('campaigns', data_selected)
     return data_transformed
 
 def transform_contact(field_id_map, contact):
@@ -75,7 +85,7 @@ def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0):
     query = {
         'keyId': 'id',
         'keyValues': list(map(lambda x: x['id'], contact_list_page['result'])),
-        'fields': list(map(lambda x: x['id'], selected_fields))
+        'fields': selected_fields
     }
     contact_page = ctx.client.post('/contact/getdata', query, tap_stream_id='contacts')
 
@@ -103,24 +113,35 @@ def sync_contacts(ctx):
         field_id_map[field_id] = field_info
     raw_fields_available = list(field_name_map.keys())
 
-    selected_fields = []
-    for prop, schema in contacts_stream.schema.properties.items():
-        if schema.selected == True:
-            if prop not in raw_fields_available:
-                raise Exception('Field `{}` not currently available from Emarsys'.format(
-                    prop))
-            selected_fields.append(field_name_map[prop])
+    selected_field_maps = []
+    for metadata_entry in contacts_stream.metadata:
+        breadcrumb = metadata_entry.get('breadcrumb')
+        if len(breadcrumb) > 0 and breadcrumb[0] == 'properties':
+            field_name = breadcrumb[1]
+            metadata = metadata_entry.get('metadata')
+            if field_name not in ['id', 'uid'] and \
+              (metadata.get('selected') == True or
+               metadata.get('inclusion') == 'automatic'):
+                if field_name not in raw_fields_available:
+                    raise Exception('Field `{}` not currently available from Emarsys'.format(
+                        field_name))
+                selected_field_maps.append(field_name_map[field_name])
+
+    if len(selected_field_maps) == 0:
+        selected_fields = ['3'] # no selected fields fetches all
+    else:
+        selected_fields = list(map(lambda x: x['id'], selected_field_maps))
 
     paginate_contacts(ctx, field_id_map, selected_fields)
 
 def sync_contact_lists(ctx, sync):
     data = ctx.client.get('/contactlist', tap_stream_id='contact_lists')
-    ## TODO: select fields?
-    def contact_list_transform(contact_list):
-        return base_transform(contact_list, ['created'])
-    data_transformed = list(map(contact_list_transform, data))
+    data_transformed = list(map(partial(base_transform, ['created']), data))
     if sync:
-        write_records('contact_lists', data_transformed)
+        stream = ctx.catalog.get_stream('contact_lists')
+        mdata = metadata.to_map(stream.metadata)
+        data_selected = list(map(partial(select_fields, mdata), data_transformed))
+        write_records('contact_lists', data_selected)
     return data_transformed
 
 def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0):
@@ -157,7 +178,7 @@ def post_metric(ctx, metric, date, campaign_id):
     })
 
 def sync_metric(ctx, campaign_id, metric, date):
-    with metrics.job_timer('daily_aggregated_metric'):
+    with singer.metrics.job_timer('daily_aggregated_metric'):
         job = post_metric(ctx, metric, date, campaign_id)
 
         num_attempts = 0

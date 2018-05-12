@@ -21,11 +21,21 @@ def discover(ctx):
     check_credentials_are_authorized(ctx)
     catalog = Catalog([])
     for tap_stream_id in schemas.static_schema_stream_ids:
-        schema = Schema.from_dict(schemas.load_schema(tap_stream_id),
-                                  inclusion="automatic")
+        schema = Schema.from_dict(schemas.load_schema(tap_stream_id))
         metadata = []
         if tap_stream_id in schemas.ROOT_METADATA:
             metadata.append(schemas.ROOT_METADATA[tap_stream_id])
+        for field_name in schema.properties.keys():
+            if field_name in schemas.PK_FIELDS[tap_stream_id]:
+                inclusion = 'automatic'
+            else:
+                inclusion = 'available'
+            metadata.append({
+                'metadata': {
+                    'inclusion': inclusion
+                },
+                'breadcrumb': ['properties', field_name]
+            })
         catalog.streams.append(CatalogEntry(
             stream=tap_stream_id,
             tap_stream_id=tap_stream_id,
@@ -33,12 +43,13 @@ def discover(ctx):
             schema=schema,
             metadata=metadata
         ))
-    contacts_schema = schemas.get_contacts_schema(ctx)
+    contacts_schema, contact_metadata = schemas.get_contacts_schema(ctx)
     catalog.streams.append(CatalogEntry(
         stream='contacts',
         tap_stream_id='contacts',
         key_properties=schemas.PK_FIELDS['contacts'],
-        schema=contacts_schema
+        schema=contacts_schema,
+        metadata=contact_metadata
     ))
 
     catalog.dump()
