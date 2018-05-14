@@ -262,26 +262,23 @@ def sync_metrics(ctx, campaigns):
         campaign_metrics = metrics_selected
         last_date = None
 
-    campaigns_to_resume = campaign_ids.copy()
-    for campaign_id in campaign_ids:
-        metrics_to_resume = metrics_selected.copy()
-        for metric in campaign_metrics:
-            current_date = last_date or start_date
-            last_date = None
-            while current_date <= end_date:
-                next_date = current_date.add(days=1)
+    current_date = last_date or start_date
+    while current_date <= end_date:
+        next_date = current_date.add(days=1)
+        campaigns_to_resume = campaign_ids.copy()
+        for campaign_id in campaign_ids:
+            metrics_to_resume = metrics_selected.copy()
+            for metric in campaign_metrics:
                 sync_metric(ctx,
                             campaign_id,
                             metric,
                             current_date.to_date_string(),
                             next_date.to_date_string())
-                date_to_resume = current_date
-                write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, date_to_resume)
-                current_date = next_date
-            date_to_resume = None
-            metrics_to_resume.remove(metric)
-        campaigns_to_resume.remove(campaign_id)
-        campaign_metrics = metrics_selected
+                write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, current_date)
+                metrics_to_resume.remove(metric)
+            campaigns_to_resume.remove(campaign_id)
+            campaign_metrics = metrics_selected
+        current_date = next_date
 
     reset_stream(ctx.state, 'metrics')
     write_bookmark(ctx.state, 'metrics', 'last_metric_date', end_date.to_date_string())
