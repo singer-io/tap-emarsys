@@ -174,26 +174,34 @@ def sync_contact_lists_memberships(ctx, contact_lists):
 @on_exception(expo, RateLimitException, max_tries=5)
 @sleep_and_retry
 @limits(calls=1, period=61) # 60 seconds needed to be padded by 1 second to work
-def post_metric(ctx, metric, date, campaign_id):
+def post_metric(ctx, metric, start_date, end_date, campaign_id):
+    LOGGER.info('Metrics query - metric: {} start_date: {} end_date: {} campaign_id: {}'.format(
+        metric,
+        start_date,
+        end_date,
+        campaign_id))
     return ctx.client.post(
         '/email/responses',
         {
             'type': metric,
-            'start_date': date,
-            'end_date': date,
+            'start_date': start_date,
+            'end_date': end_date,
             'campaign_id': campaign_id
         },
         endpoint='metrics_job')
 
-def sync_metric(ctx, campaign_id, metric, date):
+def sync_metric(ctx, campaign_id, metric, start_date, end_date):
     with singer.metrics.job_timer('daily_aggregated_metric'):
-        job = post_metric(ctx, metric, date, campaign_id)
+        job = post_metric(ctx, metric, start_date, end_date, campaign_id)
+
+        LOGGER.info('Metrics query job - {}'.format(job['id']))
 
         start = time.monotonic()
         while True:
             if (time.monotonic() - start) >= MAX_METRIC_JOB_TIME:
                 raise Exception('Metric job timeout ({} secs)'.format(
                     MAX_METRIC_JOB_TIME))
+            LOGGER.info('Polling metrics query job - {}'.format(job['id']))
             data = ctx.client.get('/email/{}/responses'.format(job['id']), endpoint='metrics')
             if data != '':
                 break
@@ -206,7 +214,7 @@ def sync_metric(ctx, campaign_id, metric, date):
     data_rows = []
     for contact_id in data['contact_ids']:
         data_rows.append({
-            'date': date,
+            'date': start_date,
             'metric': metric,
             'contact_id': contact_id
         })
@@ -261,10 +269,15 @@ def sync_metrics(ctx, campaigns):
             current_date = last_date or start_date
             last_date = None
             while current_date <= end_date:
-                sync_metric(ctx, campaign_id, metric, current_date.to_date_string())
+                next_date = current_date.add(days=1)
+                sync_metric(ctx,
+                            campaign_id,
+                            metric,
+                            current_date.to_date_string(),
+                            next_date.to_date_string())
                 date_to_resume = current_date
                 write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, date_to_resume)
-                current_date = current_date.add(days=1)
+                current_date = next_date
             date_to_resume = None
             metrics_to_resume.remove(metric)
         campaigns_to_resume.remove(campaign_id)
