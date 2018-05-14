@@ -1,25 +1,26 @@
 import time
 from functools import partial
 
-import singer
 import pendulum
-import requests
+import singer
 from singer import metadata
-from singer.bookmarks import write_bookmark, clear_bookmark
+from singer.bookmarks import write_bookmark, reset_stream
 from ratelimit import limits, sleep_and_retry, RateLimitException
 from backoff import on_exception, expo
 
 from .schemas import (
     IDS,
     get_contacts_raw_fields,
-    get_contact_field_type,
     normalize_fieldname,
     METRICS_AVAILABLE
 )
 
 LOGGER = singer.get_logger()
 
-def count(tap_stream_id, records):  
+MAX_METRIC_JOB_TIME = 1800
+METRIC_JOB_POLL_SLEEP = 5
+
+def count(tap_stream_id, records):
     with singer.metrics.record_counter(tap_stream_id) as counter:
         counter.increment(len(records))
 
@@ -40,15 +41,15 @@ def base_transform(date_fields, obj):
 def select_fields(mdata, obj):
     new_obj = {}
     for key, value in obj.items():
-        metadata = mdata.get(('properties', key))
-        if metadata and \
-           (metadata.get('selected') == True or
-            metadata.get('inclusion') == 'automatic'):
-           new_obj[key] = value
+        field_metadata = mdata.get(('properties', key))
+        if field_metadata and \
+           (field_metadata.get('selected') is True or \
+            field_metadata.get('inclusion') == 'automatic'):
+            new_obj[key] = value
     return new_obj
 
 def sync_campaigns(ctx, sync):
-    data = ctx.client.get('/email/', tap_stream_id='campaigns', params={
+    data = ctx.client.get('/email/', endpoint='campaigns', params={
         'showdeleted': 1
     })
     data_transformed = list(map(partial(base_transform, ['created', 'deleted']), data))
@@ -74,12 +75,16 @@ def transform_contact(field_id_map, contact):
     return new_obj
 
 def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0):
-    contact_list_page = ctx.client.get('/contact/query/', params={
-        'return': 3,
-        'limit': limit,
-        'offset': offset
-    })
-    if len(contact_list_page['errors']) > 0:
+    contact_list_page = ctx.client.get(
+        '/contact/query/',
+        endpoint='contacts_list',
+        params={
+            'return': 3,
+            'limit': limit,
+            'offset': offset
+        })
+
+    if contact_list_page['errors']:
         raise Exception('contacts - {}'.format(','.join(contact_list_page['errors'])))
 
     query = {
@@ -87,7 +92,7 @@ def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0):
         'keyValues': list(map(lambda x: x['id'], contact_list_page['result'])),
         'fields': selected_fields
     }
-    contact_page = ctx.client.post('/contact/getdata', query, tap_stream_id='contacts')
+    contact_page = ctx.client.post('/contact/getdata', query, endpoint='contacts')
 
     contacts = list(map(partial(transform_contact, field_id_map), contact_page['result']))
     write_records('contacts', contacts)
@@ -116,18 +121,18 @@ def sync_contacts(ctx):
     selected_field_maps = []
     for metadata_entry in contacts_stream.metadata:
         breadcrumb = metadata_entry.get('breadcrumb')
-        if len(breadcrumb) > 0 and breadcrumb[0] == 'properties':
+        if breadcrumb and breadcrumb[0] == 'properties':
             field_name = breadcrumb[1]
-            metadata = metadata_entry.get('metadata')
+            field_metadata = metadata_entry.get('metadata')
             if field_name not in ['id', 'uid'] and \
-              (metadata.get('selected') == True or
-               metadata.get('inclusion') == 'automatic'):
+              (field_metadata.get('selected') is True or \
+               field_metadata.get('inclusion') == 'automatic'):
                 if field_name not in raw_fields_available:
                     raise Exception('Field `{}` not currently available from Emarsys'.format(
                         field_name))
                 selected_field_maps.append(field_name_map[field_name])
 
-    if len(selected_field_maps) == 0:
+    if not selected_field_maps:
         selected_fields = ['3'] # no selected fields fetches all
     else:
         selected_fields = list(map(lambda x: x['id'], selected_field_maps))
@@ -135,7 +140,7 @@ def sync_contacts(ctx):
     paginate_contacts(ctx, field_id_map, selected_fields)
 
 def sync_contact_lists(ctx, sync):
-    data = ctx.client.get('/contactlist', tap_stream_id='contact_lists')
+    data = ctx.client.get('/contactlist', endpoint='contact_lists')
     data_transformed = list(map(partial(base_transform, ['created']), data))
     if sync:
         stream = ctx.catalog.get_stream('contact_lists')
@@ -150,7 +155,7 @@ def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0)
                                         'limit': limit,
                                         'offset': offset
                                     },
-                                    tap_stream_id='contact_list_memberships')
+                                    endpoint='contact_list_memberships')
     memberships = []
     for membership_id in membership_ids:
         memberships.append({
@@ -170,25 +175,30 @@ def sync_contact_lists_memberships(ctx, contact_lists):
 @sleep_and_retry
 @limits(calls=1, period=61) # 60 seconds needed to be padded by 1 second to work
 def post_metric(ctx, metric, date, campaign_id):
-    return ctx.client.post('/email/responses', {
-        'type': metric,
-        'start_date': date,
-        'end_date': date,
-        'campaign_id': campaign_id
-    })
+    return ctx.client.post(
+        '/email/responses',
+        {
+            'type': metric,
+            'start_date': date,
+            'end_date': date,
+            'campaign_id': campaign_id
+        },
+        endpoint='metrics_job')
 
 def sync_metric(ctx, campaign_id, metric, date):
     with singer.metrics.job_timer('daily_aggregated_metric'):
         job = post_metric(ctx, metric, date, campaign_id)
 
-        num_attempts = 0
-        while num_attempts < 10:
-            num_attempts += 1
-            data = ctx.client.get('/email/{}/responses'.format(job['id']))
+        start = time.monotonic()
+        while True:
+            if (time.monotonic() - start) >= MAX_METRIC_JOB_TIME:
+                raise Exception('Metric job timeout ({} secs)'.format(
+                    MAX_METRIC_JOB_TIME))
+            data = ctx.client.get('/email/{}/responses'.format(job['id']), endpoint='metrics')
             if data != '':
                 break
             else:
-                time.sleep(5)
+                time.sleep(METRIC_JOB_POLL_SLEEP)
 
     if len(data['contact_ids']) == 1 and data['contact_ids'][0] == '':
         return
@@ -238,7 +248,7 @@ def sync_metrics(ctx, campaigns):
     else:
         campaign_ids = (
             list(map(lambda x: x['id'],
-                     filter(lambda x: x['deleted'] == None,
+                     filter(lambda x: x['deleted'] is None,
                             campaigns)))
         )
         campaign_metrics = metrics_selected
@@ -273,9 +283,9 @@ def sync_selected_streams(ctx):
         ctx.state['last_synced_stream'] = IDS.CONTACTS
         ctx.write_state()
 
-    if (IDS.CONTACT_LISTS in selected_streams and
+    if (IDS.CONTACT_LISTS in selected_streams and \
         last_synced_stream != IDS.CONTACT_LISTS) or \
-       (IDS.CONTACT_LIST_MEMBERSHIPS in selected_streams and
+       (IDS.CONTACT_LIST_MEMBERSHIPS in selected_streams and \
         last_synced_stream != IDS.CONTACT_LIST_MEMBERSHIPS):
         contact_lists = sync_contact_lists(ctx, IDS.CONTACT_LISTS in selected_streams)
         ctx.state['last_synced_stream'] = IDS.CONTACT_LISTS
@@ -287,9 +297,9 @@ def sync_selected_streams(ctx):
         ctx.state['last_synced_stream'] = IDS.CONTACT_LIST_MEMBERSHIPS
         ctx.write_state()
 
-    if (IDS.CAMPAIGNS in selected_streams and
+    if (IDS.CAMPAIGNS in selected_streams and \
         last_synced_stream != IDS.CAMPAIGNS) or \
-       (IDS.METRICS in selected_streams and
+       (IDS.METRICS in selected_streams and \
         last_synced_stream != IDS.METRICS):
         campaigns = sync_campaigns(ctx, IDS.CAMPAIGNS in selected_streams)
         ctx.state['last_synced_stream'] = IDS.CAMPAIGNS
@@ -301,4 +311,4 @@ def sync_selected_streams(ctx):
         ctx.write_state()
 
     ctx.state['last_synced_stream'] = None
-    ctx.write_state()   
+    ctx.write_state()

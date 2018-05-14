@@ -62,10 +62,10 @@ class Client(object):
 
         kwargs['headers']['Content-Type'] = 'application/json'
 
-        if 'tap_stream_id' in kwargs:
-            tap_stream_id = kwargs['tap_stream_id']
-            del kwargs['tap_stream_id']
-            with metrics.http_request_timer(tap_stream_id) as timer:
+        if 'endpoint' in kwargs:
+            endpoint = kwargs['endpoint']
+            del kwargs['endpoint']
+            with metrics.http_request_timer(endpoint) as timer:
                 response = requests.request(method, self.url(path), **kwargs)
                 timer.tags[metrics.Tag.http_status_code] = response.status_code
         else:
@@ -78,7 +78,7 @@ class Client(object):
             raise RateLimitException()
         try:
             response.raise_for_status()
-        except Exception as e:
+        except:
             LOGGER.error('{} - {}'.format(response.status_code, response.text))
             raise
         return response.json()['data']
@@ -89,4 +89,3 @@ class Client(object):
     def post(self, path, data, **kwargs):
         kwargs['data'] = json.dumps(data)
         return self.request('post', path, **kwargs)
-

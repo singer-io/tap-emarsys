@@ -5,14 +5,14 @@ import singer
 from singer import utils
 from singer.catalog import Schema
 
-class IDS(object):
+class IDS(object): # pylint: disable=too-few-public-methods
     CAMPAIGNS = 'campaigns'
     CONTACTS = 'contacts'
     CONTACT_LISTS = 'contact_lists'
     CONTACT_LIST_MEMBERSHIPS = 'contact_list_memberships'
     METRICS = 'metrics'
 
-static_schema_stream_ids = [
+STATIC_SCHEMA_STREAM_IDS = [
     IDS.CAMPAIGNS,
     IDS.CONTACT_LISTS,
     IDS.CONTACT_LIST_MEMBERSHIPS,
@@ -61,7 +61,7 @@ def get_contact_field_type(raw_field_type):
     return 'string', None
 
 def get_contacts_raw_fields(ctx):
-    return ctx.client.get('/field')
+    return ctx.client.get('/field', endpoint='contact_fields')
 
 def get_contacts_schema(ctx):
     raw_fields = get_contacts_raw_fields(ctx)

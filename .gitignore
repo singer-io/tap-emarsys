@@ -101,5 +101,6 @@ rsa-key
 tags
 singer-check-tap-data
 state.json
-*.config.json
+*test.config.json
 *.catalog.json
+*.txt

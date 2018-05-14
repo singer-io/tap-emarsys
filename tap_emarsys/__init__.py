@@ -14,13 +14,13 @@ REQUIRED_CONFIG_KEYS = ["username", "secret"]
 
 LOGGER = singer.get_logger()
 
-def check_credentials_are_authorized(ctx):
+def check_authorization(ctx):
     ctx.client.get('/settings')
 
 def discover(ctx):
-    check_credentials_are_authorized(ctx)
+    check_authorization(ctx)
     catalog = Catalog([])
-    for tap_stream_id in schemas.static_schema_stream_ids:
+    for tap_stream_id in schemas.STATIC_SCHEMA_STREAM_IDS:
         schema = Schema.from_dict(schemas.load_schema(tap_stream_id))
         metadata = []
         if tap_stream_id in schemas.ROOT_METADATA:
@@ -55,8 +55,13 @@ def discover(ctx):
     catalog.dump()
 
 def sync(ctx):
-    for tap_stream_id in schemas.static_schema_stream_ids:
+    for tap_stream_id in schemas.STATIC_SCHEMA_STREAM_IDS:
         schemas.load_and_write_schema(tap_stream_id)
+    contacts_schema, _ = schemas.get_contacts_schema(ctx)
+    singer.write_schema('contacts',
+                        contacts_schema.to_dict(),
+                        schemas.PK_FIELDS['contacts'])
+
     streams.sync_selected_streams(ctx)
     ctx.write_state()
 
