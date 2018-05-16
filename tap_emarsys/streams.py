@@ -221,7 +221,8 @@ def sync_metric(ctx, campaign_id, metric, start_date, end_date):
         data_rows.append({
             'date': metric_date,
             'metric': metric,
-            'contact_id': contact_id
+            'contact_id': contact_id,
+            'campaign_id': campaign_id
         })
 
     write_records('metrics', data_rows)

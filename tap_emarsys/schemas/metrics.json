@@ -17,6 +17,11 @@
       "type": [
         "string"
       ]
+    },
+    "campaign_id": {
+      "type": [
+        "string"
+      ]
     }
   }
 }
