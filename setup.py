@@ -12,6 +12,9 @@ setup(
     py_modules=["tap_emarsys"],
     install_requires=[
         "singer-python>=5.1.1",
+        "pendulum",
+        "ratelimit",
+        "backoff",
         "requests",
     ],
     entry_points="""

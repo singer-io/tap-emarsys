@@ -192,7 +192,11 @@ def post_metric(ctx, metric, start_date, end_date, campaign_id):
 
 def sync_metric(ctx, campaign_id, metric, start_date, end_date):
     with singer.metrics.job_timer('daily_aggregated_metric'):
-        job = post_metric(ctx, metric, start_date, end_date, campaign_id)
+        job = post_metric(ctx,
+                          metric,
+                          start_date.to_date_string(),
+                          end_date.to_date_string(),
+                          campaign_id)
 
         LOGGER.info('Metrics query job - {}'.format(job['id']))
 
@@ -212,9 +216,10 @@ def sync_metric(ctx, campaign_id, metric, start_date, end_date):
         return
 
     data_rows = []
+    metric_date = start_date.isoformat()
     for contact_id in data['contact_ids']:
         data_rows.append({
-            'date': start_date,
+            'date': metric_date,
             'metric': metric,
             'contact_id': contact_id
         })
@@ -272,8 +277,8 @@ def sync_metrics(ctx, campaigns):
                 sync_metric(ctx,
                             campaign_id,
                             metric,
-                            current_date.to_date_string(),
-                            next_date.to_date_string())
+                            current_date,
+                            next_date)
                 write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, current_date)
                 metrics_to_resume.remove(metric)
             campaigns_to_resume.remove(campaign_id)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import json
 
 import singer
@@ -52,7 +53,7 @@ def discover(ctx):
         metadata=contact_metadata
     ))
 
-    catalog.dump()
+    return catalog
 
 def sync(ctx):
     for tap_stream_id in schemas.STATIC_SCHEMA_STREAM_IDS:
@@ -70,7 +71,8 @@ def main():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     ctx = Context(args.config, args.state)
     if args.discover:
-        discover(ctx)
+        catalog = discover(ctx)
+        json.dump(catalog.to_dict(), sys.stdout)
     else:
         ctx.catalog = Catalog.from_dict(args.properties) \
             if args.properties else discover(ctx)
