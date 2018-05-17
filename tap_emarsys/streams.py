@@ -6,7 +6,7 @@ import singer
 from singer import metadata
 from singer.bookmarks import write_bookmark, reset_stream
 from ratelimit import limits, sleep_and_retry, RateLimitException
-from backoff import on_exception, expo
+from backoff import on_exception, expo, constant
 
 from .schemas import (
     IDS,
@@ -14,6 +14,7 @@ from .schemas import (
     normalize_fieldname,
     METRICS_AVAILABLE
 )
+from .http import MetricsRateLimitException
 
 LOGGER = singer.get_logger()
 
@@ -171,6 +172,7 @@ def sync_contact_lists_memberships(ctx, contact_lists):
     for contact_list in contact_lists:
         sync_contact_list_memberships(ctx, contact_list['id'])
 
+@on_exception(constant, MetricsRateLimitException, max_tries=5, interval=60)
 @on_exception(expo, RateLimitException, max_tries=5)
 @sleep_and_retry
 @limits(calls=1, period=61) # 60 seconds needed to be padded by 1 second to work

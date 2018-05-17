@@ -16,6 +16,9 @@ LOGGER = singer.get_logger()
 class RateLimitException(Exception):
     pass
 
+class MetricsRateLimitException(Exception):
+    pass
+
 class Client(object):
     BASE_URL = 'https://api.emarsys.net/api/v2'
 
@@ -74,8 +77,10 @@ class Client(object):
         self.calls_remaining = int(response.headers['X-Ratelimit-Remaining'])
         self.limit_reset = int(response.headers['X-Ratelimit-Reset'])
 
-        if response.status_code in [423, 429, 503]:
+        if response.status_code in [429, 503]:
             raise RateLimitException()
+        if response.status_code == 423:
+            raise MetricsRateLimitException()
         try:
             response.raise_for_status()
         except:
