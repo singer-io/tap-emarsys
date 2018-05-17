@@ -24,7 +24,7 @@ PK_FIELDS = {
     IDS.CONTACTS: ['id'],
     IDS.CONTACT_LISTS: ['id'],
     IDS.CONTACT_LIST_MEMBERSHIPS: ['contact_list_id', 'contact_id'],
-    IDS.METRICS: ['date', 'metric', 'contact_id']
+    IDS.METRICS: ['date', 'metric', 'contact_id', 'campaign_id']
 }
 
 METRICS_AVAILABLE = [
