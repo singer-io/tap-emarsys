@@ -75,7 +75,7 @@ def transform_contact(field_id_map, contact):
         new_obj[field_info['name']] = value
     return new_obj
 
-def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0):
+def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0, max_page=None):
     contact_list_page = ctx.client.get(
         '/contact/query/',
         endpoint='contacts_list',
@@ -98,11 +98,18 @@ def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0):
     contacts = list(map(partial(transform_contact, field_id_map), contact_page['result']))
     write_records('contacts', contacts)
 
-    if len(contact_page['result']) == limit:
-        paginate_contacts(ctx, field_id_map, selected_fields, limit=limit, offset=offset + limit)
+    if len(contact_page['result']) == limit and \
+       (max_page is None or (offset / limit) <= max_page):
+        paginate_contacts(ctx,
+                          field_id_map,
+                          selected_fields,
+                          limit=limit,
+                          offset=offset + limit,
+                          max_page=max_page)
 
 def sync_contacts(ctx):
     contacts_stream = ctx.catalog.get_stream('contacts')
+    test_mode = ctx.config.get('test_mode')
 
     raw_fields = get_contacts_raw_fields(ctx)
     field_name_map = {}
@@ -138,7 +145,12 @@ def sync_contacts(ctx):
     else:
         selected_fields = list(map(lambda x: x['id'], selected_field_maps))
 
-    paginate_contacts(ctx, field_id_map, selected_fields)
+    if test_mode:
+        max_page = 3
+    else:
+        max_page = None
+
+    paginate_contacts(ctx, field_id_map, selected_fields, max_page=max_page)
 
 def sync_contact_lists(ctx, sync):
     data = ctx.client.get('/contactlist', endpoint='contact_lists')
@@ -150,7 +162,7 @@ def sync_contact_lists(ctx, sync):
         write_records('contact_lists', data_selected)
     return data_transformed
 
-def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0):
+def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0, max_page=None):
     membership_ids = ctx.client.get('/contactlist/{}/'.format(contact_list_id),
                                     params={
                                         'limit': limit,
@@ -166,11 +178,22 @@ def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0)
     write_records('contact_list_memberships', memberships)
 
     if len(membership_ids) == limit:
-        sync_contact_list_memberships(ctx, contact_list_id, limit=limit, offset=offset + limit)
+        sync_contact_list_memberships(ctx,
+                                      contact_list_id,
+                                      limit=limit,
+                                      offset=offset + limit,
+                                      max_page=max_page)
 
 def sync_contact_lists_memberships(ctx, contact_lists):
+    test_mode = ctx.config.get('test_mode')
+    if test_mode:
+        contact_lists = contact_lists[:2]
+        max_page = 2
+    else:
+        max_page = None
+
     for contact_list in contact_lists:
-        sync_contact_list_memberships(ctx, contact_list['id'])
+        sync_contact_list_memberships(ctx, contact_list['id'], max_page=max_page)
 
 @on_exception(constant, MetricsRateLimitException, max_tries=5, interval=60)
 @on_exception(expo, RateLimitException, max_tries=5)
@@ -236,6 +259,7 @@ def write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, date_to_res
     ctx.write_state()
 
 def sync_metrics(ctx, campaigns):
+    test_mode = ctx.config.get('test_mode')
     stream = ctx.catalog.get_stream('metrics')
     bookmark = ctx.state.get('bookmarks', {}).get('metrics', {})
 
@@ -257,7 +281,7 @@ def sync_metrics(ctx, campaigns):
     campaigns_to_resume = bookmark.get('campaigns_to_resume')
     if campaigns_to_resume:
         campaign_ids = campaigns_to_resume
-        campaign_metrics = bookmark.get('metrics_to_resume')
+        last_metrics = bookmark.get('metrics_to_resume')
         last_date = bookmark.get('date_to_resume')
         if last_date:
             last_date = pendulum.parse(last_date)
@@ -267,15 +291,23 @@ def sync_metrics(ctx, campaigns):
                      filter(lambda x: x['deleted'] is None,
                             campaigns)))
         )
-        campaign_metrics = metrics_selected
+        metrics_to_resume = metrics_selected
         last_date = None
+        last_metrics = None
 
     current_date = last_date or start_date
+
+    if test_mode:
+        end_date = current_date
+        metrics_selected = metrics_selected[:2]
+
     while current_date <= end_date:
         next_date = current_date.add(days=1)
         campaigns_to_resume = campaign_ids.copy()
         for campaign_id in campaign_ids:
-            metrics_to_resume = metrics_selected.copy()
+            campaign_metrics = last_metrics or metrics_selected
+            last_metrics = None
+            metrics_to_resume = campaign_metrics.copy()
             for metric in campaign_metrics:
                 sync_metric(ctx,
                             campaign_id,
@@ -285,7 +317,6 @@ def sync_metrics(ctx, campaigns):
                 write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, current_date)
                 metrics_to_resume.remove(metric)
             campaigns_to_resume.remove(campaign_id)
-            campaign_metrics = metrics_selected
         current_date = next_date
 
     reset_stream(ctx.state, 'metrics')
