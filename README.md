@@ -11,7 +11,7 @@ This tap:
   - [Contact Lists](https://developers.hubspot.com/docs/methods/contacts/get_contacts)
   - [Contact Lists](https://help.emarsys.com/hc/en-us/articles/115004496574-Listing-Available-Contact-Lists)
   - [Contact List Memberships](https://help.emarsys.com/hc/en-us/articles/115004467333-Listing-Contacts-in-a-Contact-List)
-  - [Email Campgaign Metrics](https://help.emarsys.com/hc/en-us/articles/115004494093-Querying-Responses-Result)
+  - [Email Campaign Metrics](https://help.emarsys.com/hc/en-us/articles/115004494093-Querying-Responses-Result)
       - Daily occurrences of email events
           - Opened
           - Not Opened
