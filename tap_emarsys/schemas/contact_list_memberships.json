@@ -1,0 +1,16 @@
+{
+  "type": ["object"],
+  "additionalProperties": false,
+  "properties": {
+    "contact_list_id": {
+      "type": [
+        "string"
+      ]
+    },
+    "contact_id": {
+      "type": [
+        "string"
+      ]
+    }
+  }
+}

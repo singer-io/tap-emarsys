@@ -1,0 +1,27 @@
+{
+  "type": ["object"],
+  "additionalProperties": false,
+  "properties": {
+    "date": {
+      "type": [
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "metric": {
+      "type": [
+        "string"
+      ]
+    },
+    "contact_id": {
+      "type": [
+        "string"
+      ]
+    },
+    "campaign_id": {
+      "type": [
+        "string"
+      ]
+    }
+  }
+}

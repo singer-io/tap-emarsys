@@ -1,0 +1,181 @@
+{
+  "type": ["object"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": [
+        "string"
+      ]
+    },
+    "event_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "is_delayed": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "administrator_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "language": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "deleted": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "fromemail_host": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "status": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "api_status": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "api_error": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "fromemail": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "fromname": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "subject": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "email_category": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "filter": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "exclude_filter": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "contactlist": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "exclude_contactlist": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "template": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "unsubscribe": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "text_only": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "browse": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "cc_list": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "source": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "html_source": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "text_source": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "content_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

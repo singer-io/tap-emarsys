@@ -1,0 +1,27 @@
+{
+  "type": ["object"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": [
+        "string"
+      ]
+    },
+    "name": {
+      "type": [
+        "string"
+      ]
+    },
+    "created": {
+      "type": [
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "type": {
+      "type": [
+        "integer"
+      ]
+    }
+  }
+}
