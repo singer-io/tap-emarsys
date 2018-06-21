@@ -68,7 +68,7 @@ def transform_contact(field_id_map, contact):
             new_obj[field_id] = value
             continue
         field_info = field_id_map[field_id]
-        if value == '':
+        if value == '' or value is None:
             value = None
         elif field_info['type'] == 'date':
             value = pendulum.parse(value).isoformat()

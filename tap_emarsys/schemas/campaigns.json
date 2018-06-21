@@ -72,6 +72,7 @@
     "api_error": {
       "type": [
         "null",
+        "integer",
         "string"
       ]
     },
@@ -102,12 +103,14 @@
     "filter": {
       "type": [
         "null",
+        "string",
         "integer"
       ]
     },
     "exclude_filter": {
       "type": [
         "null",
+        "string",
         "integer"
       ]
     },
@@ -120,6 +123,7 @@
     "exclude_contactlist": {
       "type": [
         "null",
+        "integer",
         "string"
       ]
     },
