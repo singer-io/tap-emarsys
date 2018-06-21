@@ -29,11 +29,25 @@ def write_records(tap_stream_id, records):
     singer.write_records(tap_stream_id, records)
     count(tap_stream_id, records)
 
-def base_transform(date_fields, obj):
+def get_date_and_integer_fields(stream):
+    date_fields = []
+    integer_fields = []
+    for prop, json_schema in stream.schema.properties.items():
+        _type = json_schema.type
+        if isinstance(_type, list) and 'integer' in _type or \
+           _type == 'integer':
+           integer_fields.append(prop)
+        elif json_schema.format == 'date-time':
+            date_fields.append(prop)
+    return date_fields, integer_fields
+
+def base_transform(date_fields, integer_fields, obj):
     new_obj = {}
     for field, value in obj.items():
         if value == '':
             value = None
+        elif field in integer_fields and value is not None:
+            value = int(value)
         elif field in date_fields and value is not None:
             value = pendulum.parse(value).isoformat()
         new_obj[field] = value
@@ -53,9 +67,13 @@ def sync_campaigns(ctx, sync):
     data = ctx.client.get('/email/', endpoint='campaigns', params={
         'showdeleted': 1
     })
-    data_transformed = list(map(partial(base_transform, ['created', 'deleted']), data))
+
+    stream = ctx.catalog.get_stream('campaigns')
+    date_fields, integer_fields = get_date_and_integer_fields(stream)
+
+    data_transformed = list(map(partial(base_transform, date_fields, integer_fields), data))
+
     if sync:
-        stream = ctx.catalog.get_stream('campaigns')
         mdata = metadata.to_map(stream.metadata)
         data_selected = list(map(partial(select_fields, mdata), data_transformed))
         write_records('campaigns', data_selected)
@@ -72,6 +90,8 @@ def transform_contact(field_id_map, contact):
             value = None
         elif field_info['type'] == 'date':
             value = pendulum.parse(value).isoformat()
+        elif field_info['type'] == 'numeric':
+            value = float(value)
         new_obj[field_info['name']] = value
     return new_obj
 
@@ -154,9 +174,12 @@ def sync_contacts(ctx):
 
 def sync_contact_lists(ctx, sync):
     data = ctx.client.get('/contactlist', endpoint='contact_lists')
-    data_transformed = list(map(partial(base_transform, ['created']), data))
+
+    stream = ctx.catalog.get_stream('contact_lists')
+    date_fields, integer_fields = get_date_and_integer_fields(stream)
+    data_transformed = list(map(partial(base_transform, date_fields, integer_fields), data))
+
     if sync:
-        stream = ctx.catalog.get_stream('contact_lists')
         mdata = metadata.to_map(stream.metadata)
         data_selected = list(map(partial(select_fields, mdata), data_transformed))
         write_records('contact_lists', data_selected)
