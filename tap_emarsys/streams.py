@@ -96,6 +96,8 @@ def transform_contact(field_id_map, contact):
     return new_obj
 
 def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0, max_page=None):
+    LOGGER.info('contacts - Syncing page - limit: {}, offset: {}'.format(limit, offset))
+
     contact_list_page = ctx.client.get(
         '/contact/query/',
         endpoint='contacts_list',
@@ -186,6 +188,9 @@ def sync_contact_lists(ctx, sync):
     return data_transformed
 
 def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0, max_page=None):
+    LOGGER.info('contact_list_memberships - Syncing page - limit: {}, offset: {}'.format(
+                    limit, offset))
+
     membership_ids = ctx.client.get('/contactlist/{}/'.format(contact_list_id),
                                     params={
                                         'limit': limit,
