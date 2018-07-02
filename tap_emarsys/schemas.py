@@ -53,12 +53,26 @@ def normalize_fieldname(fieldname):
     fieldname = re.sub(r'[\s\-]', '_', fieldname)
     return re.sub(r'[^a-z0-9_]', '', fieldname)
 
-def get_contact_field_type(raw_field_type):
+def get_contact_json_schema(raw_field_type):
     if raw_field_type == 'date':
-        return 'string', 'date-time'
+        return {
+            'type': ['null', 'string'],
+            'format': 'date-time'
+        }
     if raw_field_type == 'numeric':
-        return 'number', None
-    return 'string', None
+        return {
+            'type': ['null', 'number']
+        }
+    if raw_field_type == 'multichoice':
+        return {
+            'type': ['null', 'array'],
+            'items': {
+                'type': 'integer'
+            }
+        }
+    return {
+        'type': ['null', 'string']
+    }
 
 def get_contacts_raw_fields(ctx):
     return ctx.client.get('/field', endpoint='contact_fields')
@@ -68,12 +82,7 @@ def get_contacts_schema(ctx):
     properties = {}
     metadata = []
     for raw_field in raw_fields:
-        _type, _format = get_contact_field_type(raw_field['application_type'])
-        json_schema = {
-            'type': ['null', _type]
-        }
-        if _format is not None:
-            json_schema['format'] = _format
+        json_schema = get_contact_json_schema(raw_field['application_type'])
         field_name = normalize_fieldname(raw_field['name'])
         properties[field_name] = json_schema
         metadata.append({

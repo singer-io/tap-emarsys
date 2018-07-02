@@ -6,12 +6,11 @@ This tap:
 
 - Pulls raw data from Emarsys's [API](https://help.emarsys.com/hc/en-us/articles/115005253125-Emarsys-API-Endpoints)
 - Extracts the following resources from Emarsys
-  - [Campaigns](https://help.emarsys.com/hc/en-us/articles/115004522154-Listing-Email-Campaigns)
-  - [Contacts](https://help.emarsys.com/hc/en-us/articles/115004494474-Querying-Contact-Data)
-  - [Contact Lists](https://developers.hubspot.com/docs/methods/contacts/get_contacts)
-  - [Contact Lists](https://help.emarsys.com/hc/en-us/articles/115004496574-Listing-Available-Contact-Lists)
-  - [Contact List Memberships](https://help.emarsys.com/hc/en-us/articles/115004467333-Listing-Contacts-in-a-Contact-List)
-  - [Email Campaign Metrics](https://help.emarsys.com/hc/en-us/articles/115004494093-Querying-Responses-Result)
+  - [Campaigns](https://dev.emarsys.com/v2/email-campaigns/list-email-campaigns)
+  - [Contacts](https://dev.emarsys.com/v2/contacts/get-contact-data)
+  - [Contact Lists](https://dev.emarsys.com/v2/contact-lists/list-contact-lists)
+  - [Contact List Memberships](https://dev.emarsys.com/v2/contact-lists/list-contacts-in-a-contact-list)
+  - [Email Campaign Metrics](https://dev.emarsys.com/v2/campaign-launch/get-email-response-metrics-and-deliverability-results)
       - Daily occurrences of email events
           - Opened
           - Not Opened
