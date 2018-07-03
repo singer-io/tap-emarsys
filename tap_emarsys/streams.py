@@ -95,7 +95,7 @@ def transform_contact(field_id_map, contact):
         new_obj[field_info['name']] = value
     return new_obj
 
-def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0, max_page=None):
+def sync_contacts_page(ctx, field_id_map, selected_fields, limit, offset):
     LOGGER.info('contacts - Syncing page - limit: {}, offset: {}'.format(limit, offset))
 
     contact_list_page = ctx.client.get(
@@ -120,14 +120,7 @@ def paginate_contacts(ctx, field_id_map, selected_fields, limit=1000, offset=0, 
     contacts = list(map(partial(transform_contact, field_id_map), contact_page['result']))
     write_records('contacts', contacts)
 
-    if len(contact_page['result']) == limit and \
-       (max_page is None or (offset / limit) <= max_page):
-        paginate_contacts(ctx,
-                          field_id_map,
-                          selected_fields,
-                          limit=limit,
-                          offset=offset + limit,
-                          max_page=max_page)
+    return len(contact_page['result'])
 
 def sync_contacts(ctx):
     contacts_stream = ctx.catalog.get_stream('contacts')
@@ -172,7 +165,13 @@ def sync_contacts(ctx):
     else:
         max_page = None
 
-    paginate_contacts(ctx, field_id_map, selected_fields, max_page=max_page)
+    limit = 1000
+    count = limit
+    offset = 0
+    while count == limit and \
+          (max_page is None or (offset / limit) <= max_page):
+        count = sync_contacts_page(ctx, field_id_map, selected_fields, limit, offset)
+        offset += limit
 
 def sync_contact_lists(ctx, sync):
     data = ctx.client.get('/contactlist', endpoint='contact_lists')
@@ -187,9 +186,11 @@ def sync_contact_lists(ctx, sync):
         write_records('contact_lists', data_selected)
     return data_transformed
 
-def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0, max_page=None):
-    LOGGER.info('contact_list_memberships - Syncing page - limit: {}, offset: {}'.format(
-                    limit, offset))
+def sync_contact_list_memberships(ctx, contact_list_id, limit, offset):
+    LOGGER.info('contact_list_memberships - Syncing page - list_id: {}, limit: {}, offset: {}'.format(
+                    contact_list_id,
+                    limit,
+                    offset))
 
     membership_ids = ctx.client.get('/contactlist/{}/'.format(contact_list_id),
                                     params={
@@ -205,12 +206,7 @@ def sync_contact_list_memberships(ctx, contact_list_id, limit=1000000, offset=0,
         })
     write_records('contact_list_memberships', memberships)
 
-    if len(membership_ids) == limit:
-        sync_contact_list_memberships(ctx,
-                                      contact_list_id,
-                                      limit=limit,
-                                      offset=offset + limit,
-                                      max_page=max_page)
+    return len(memberships)
 
 def sync_contact_lists_memberships(ctx, contact_lists):
     test_mode = ctx.config.get('test_mode')
@@ -221,7 +217,13 @@ def sync_contact_lists_memberships(ctx, contact_lists):
         max_page = None
 
     for contact_list in contact_lists:
-        sync_contact_list_memberships(ctx, contact_list['id'], max_page=max_page)
+        limit = 1000000
+        count = limit
+        offset = 0
+        while count == limit and \
+              (max_page is None or (offset / limit) <= max_page):
+            count = sync_contact_list_memberships(ctx, contact_list['id'], limit, offset)
+            offset += limit
 
 @on_exception(constant, MetricsRateLimitException, max_tries=5, interval=60)
 @on_exception(expo, RateLimitException, max_tries=5)
