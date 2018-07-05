@@ -124,7 +124,9 @@ def sync_contacts_page(ctx, field_id_map, selected_fields, limit, offset):
 
 def sync_contacts(ctx):
     contacts_stream = ctx.catalog.get_stream('contacts')
-    test_mode = ctx.config.get('test_mode')
+    max_pages = ctx.config.get('max_pages')
+    if max_pages:
+        max_pages = int(max_pages)
 
     raw_fields = get_contacts_raw_fields(ctx)
     field_name_map = {}
@@ -160,16 +162,11 @@ def sync_contacts(ctx):
     else:
         selected_fields = list(map(lambda x: x['id'], selected_field_maps))
 
-    if test_mode:
-        max_page = 3
-    else:
-        max_page = None
-
     limit = 1000
     count = limit
     offset = 0
     while count == limit and \
-          (max_page is None or (offset / limit) <= max_page):
+          (max_pages is None or (offset / limit) <= max_pages):
         count = sync_contacts_page(ctx, field_id_map, selected_fields, limit, offset)
         offset += limit
 
@@ -209,19 +206,19 @@ def sync_contact_list_memberships(ctx, contact_list_id, limit, offset):
     return len(memberships)
 
 def sync_contact_lists_memberships(ctx, contact_lists):
-    test_mode = ctx.config.get('test_mode')
-    if test_mode:
-        contact_lists = contact_lists[:2]
-        max_page = 2
-    else:
-        max_page = None
+    max_pages = ctx.config.get('max_pages')
+    if max_pages:
+        max_pages = int(max_pages)
+
+    if max_pages:
+        contact_lists = contact_lists[:max_pages]
 
     for contact_list in contact_lists:
         limit = 1000000
         count = limit
         offset = 0
         while count == limit and \
-              (max_page is None or (offset / limit) <= max_page):
+              (max_pages is None or (offset / limit) <= max_pages):
             count = sync_contact_list_memberships(ctx, contact_list['id'], limit, offset)
             offset += limit
 
@@ -289,7 +286,9 @@ def write_metrics_state(ctx, campaigns_to_resume, metrics_to_resume, date_to_res
     ctx.write_state()
 
 def sync_metrics(ctx, campaigns):
-    test_mode = ctx.config.get('test_mode')
+    max_pages = ctx.config.get('max_pages')
+    if max_pages:
+        max_pages = int(max_pages)
     stream = ctx.catalog.get_stream('metrics')
     bookmark = ctx.state.get('bookmarks', {}).get('metrics', {})
 
@@ -327,9 +326,9 @@ def sync_metrics(ctx, campaigns):
 
     current_date = last_date or start_date
 
-    if test_mode:
+    if max_pages:
         end_date = current_date
-        metrics_selected = metrics_selected[:2]
+        metrics_selected = metrics_selected[:max_pages]
 
     while current_date <= end_date:
         next_date = current_date.add(days=1)
