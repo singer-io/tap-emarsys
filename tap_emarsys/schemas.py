@@ -63,6 +63,13 @@ def get_contact_json_schema(raw_field_type):
         return {
             'type': ['null', 'number']
         }
+    if raw_field_type == 'special':
+        return {
+            'type': ['null', 'array', 'string'],
+            'items': {
+                'type': 'string'
+            }
+        }
     if raw_field_type == 'multichoice':
         return {
             'type': ['null', 'array'],
