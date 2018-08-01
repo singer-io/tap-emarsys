@@ -86,15 +86,23 @@ def get_contacts_raw_fields(ctx):
 
 def get_contacts_schema(ctx):
     raw_fields = get_contacts_raw_fields(ctx)
+    # sort so fields are processed in created order, more recent duplicates are appended with _{id}
+    raw_fields = sorted(raw_fields, key=lambda x: x['id'])
     properties = {}
     metadata = []
     for raw_field in raw_fields:
+        field_id = raw_field['id']
         json_schema = get_contact_json_schema(raw_field['application_type'])
+
         field_name = normalize_fieldname(raw_field['name'])
+        if field_name in properties:
+            field_name += '_' + str(field_id)
+        
         properties[field_name] = json_schema
         metadata.append({
             'metadata': {
-                'inclusion': 'available'
+                'inclusion': 'available',
+                'tap-emarsys.field-id': field_id
             },
             'breadcrumb': ['properties', field_name]
         })
