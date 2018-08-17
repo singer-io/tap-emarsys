@@ -129,11 +129,16 @@ def sync_contacts(ctx):
         max_pages = int(max_pages)
 
     raw_fields = get_contacts_raw_fields(ctx)
+    # sort so fields are processed in created order, more recent duplicates are appended with _{id}
+    raw_fields = sorted(raw_fields, key=lambda x: x['id'])
     field_name_map = {}
     field_id_map = {}
     for raw_field in raw_fields:
         field_id = str(raw_field['id'])
         field_name = normalize_fieldname(raw_field['name'])
+        if field_name in field_name_map:
+            field_name += '_' + str(field_id)
+
         field_info = {
             'type': raw_field['application_type'],
             'name': field_name,
