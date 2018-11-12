@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="tap-emarsys",
-    version="0.4.2",
+    version="0.4.3",
     description="Singer.io tap for extracting data from the Emarsys API",
     author="Stitch",
     url="http://singer.io",
@@ -15,7 +15,7 @@ setup(
         "pendulum",
         "ratelimit",
         "backoff==1.3.2",
-        "requests",
+        "requests==2.20.0",
     ],
     entry_points="""
     [console_scripts]
